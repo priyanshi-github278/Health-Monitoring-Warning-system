@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Smart Community Health Monitoring — NE India</title>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  /* ====== Basic reset & layout ====== */
+  * { box-sizing: border-box; margin:0; padding:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial; }
+  body { background:#f2f8fb; color:#222; padding:18px; line-height:1.4; }
+  .container { max-width:1100px; margin:0 auto; }
+
+  header {
+    background: linear-gradient(90deg,#0069a7,#023e8a);
+    color:#fff; padding:18px 20px; border-radius:10px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  header h1 { font-size:1.05rem; margin-right:10px; }
+  .lang-select { background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.12); color:#fff; padding:8px 10px; border-radius:6px; }
+
+  .top-row { display:flex; gap:16px; margin-top:18px; align-items:flex-start; flex-wrap:wrap; }
+  .card {
+    background:#fff; padding:14px; border-radius:10px;
+    box-shadow: 0 6px 18px rgba(12,35,60,0.06);
+  }
+
+  /* left column (main) */
+  .main { flex:1 1 680px; display:flex; flex-direction:column; gap:16px; }
+
+  /* small images row */
+  .imgs { display:flex; gap:12px; }
+  .imgbox { flex:1; padding:12px; border-radius:8px; background:linear-gradient(180deg,#eef7fb,#fff); text-align:center; }
+  .imgbox svg { width:100%; max-width:160px; height:100px; }
+
+  /* dashboard charts */
+  .charts-grid { display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:12px; margin-top:6px; }
+  .chart-card { padding:8px; text-align:center; border-radius:8px; background:#fff; border:1px solid #eef4f9; }
+  .chart-card canvas { width:150px !important; height:150px !important; margin:0 auto; display:block; }
+
+  /* steps and about text */
+  .about, .steps { padding:12px; background:#fff; border-radius:10px; }
+
+  /* form */
+  form { display:grid; gap:10px; }
+  .form-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  label { width:120px; font-weight:600; font-size:0.95rem; }
+  input[type=text], input[type=email], input[type=tel], input[type=number], select, textarea, input[type=date] {
+    padding:8px 10px; border-radius:6px; border:1px solid #cddbea; min-width:180px;
+  }
+  .small { width:220px; }
+  .big { width:100%; min-width:260px; }
+  .form-actions { display:flex; gap:8px; margin-top:6px; }
+  .btn { padding:9px 12px; border-radius:8px; cursor:pointer; border:none; font-weight:700; }
+  .btn-primary { background:#0077b6; color:#fff; }
+  .btn-ghost { background:#fff; border:1px solid #bccfe6; color:#123; }
+
+  /* modal */
+  .modal {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.45); z-index:999; visibility:hidden; opacity:0; transition:.15s;
+  }
+  .modal.open { visibility:visible; opacity:1; }
+  .modal .box { background:#fff; padding:18px; border-radius:10px; width:90%; max-width:720px; max-height:85vh; overflow:auto; }
+
+  /* alerts box */
+  .alerts { display:flex; gap:12px; align-items:center; }
+  .legend { display:flex; gap:8px; align-items:center; font-weight:700; }
+  .dot { width:14px; height:14px; border-radius:50%; display:inline-block; margin-right:6px; }
+
+  .green { background:#2ecc71; }
+  .yellow { background:#f1c40f; }
+  .red { background:#e74c3c; }
+
+  /* responsive */
+  @media (max-width:940px){
+    .charts-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .imgs { flex-direction:column; }
+    label{ width:100%; }
+  }
+  @media (max-width:560px){
+    .charts-grid { grid-template-columns: repeat(1, minmax(0,1fr)); }
+  }
+
+  /* tiny notes */
+  .muted { color:#567; font-size:0.92rem; }
+  .small-note { font-size:0.88rem; color:#6b7b8b; margin-top:6px; }
+
+  /* toast */
+  #toast { position:fixed; right:18px; bottom:18px; background:#222; color:#fff; padding:10px 14px; border-radius:8px; display:none; z-index:1200; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <h1 id="title">Smart Community Health Monitoring & Early Warning System</h1>
+
+    <!-- language selector (translations handled in JS) -->
+    <div>
+      <select id="langSelect" class="lang-select" aria-label="Select language">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी (Hindi)</option>
+        <option value="as">অসমীয়া (Assamese)</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="top-row">
+    <!-- MAIN COLUMN -->
+    <div class="main">
+
+      <!-- IMAGES -->
+      <div class="card imgs" aria-hidden="false">
+        <div class="imgbox">
+          <!-- healthcare SVG 1 -->
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="health-image-1">
+            <rect x="6" y="10" width="52" height="38" rx="6" fill="#e6f6ff"/>
+            <path d="M32 26v14" stroke="#0077b6" stroke-width="2" stroke-linecap="round"/>
+            <path d="M25 33h14" stroke="#0077b6" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="18" cy="22" r="3" fill="#0077b6"/>
+          </svg>
+          <div class="small-note">Community health outreach</div>
+        </div>
+
+        <div class="imgbox">
+          <!-- healthcare SVG 2 -->
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="health-image-2">
+            <rect x="8" y="8" width="48" height="48" rx="6" fill="#fff8e6"/>
+            <path d="M20 34h24M32 22v24" stroke="#f39c12" stroke-width="2.4" stroke-linecap="round"/>
+            <circle cx="46" cy="20" r="3.2" fill="#f39c12"/>
+          </svg>
+          <div class="small-note">Rapid response & alerts</div>
+        </div>
+
+        <div class="imgbox">
+          <!-- healthcare SVG 3 -->
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="health-image-3">
+            <rect x="6" y="12" width="52" height="40" rx="6" fill="#eefbe8"/>
+            <path d="M18 28c4-6 12-6 16 0s12 6 16 0" stroke="#27ae60" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <circle cx="24" cy="22" r="3.5" fill="#27ae60"/>
+          </svg>
+          <div class="small-note">Local caregivers & ASHAs</div>
+        </div>
+      </div>
+
+      <!-- ABOUT -->
+      <div class="card about" id="aboutCard">
+        <h3 id="aboutTitle">What this website does</h3>
+        <p id="aboutText" class="muted">
+          A simple system to collect community reports, show small state-wise pie charts of top illnesses,
+          compute a risk level per report and display alerts with short first-aid tips. Beginner-friendly front-end only prototype.
+        </p>
+      </div>
+
+      <!-- STEPS -->
+      <div class="card steps" id="stepsCard">
+        <h3 id="stepsTitle">Steps for users</h3>
+        <ol id="stepsList">
+          <li>Fill the form (Google Form or site form) with your details.</li>
+          <li>View the dashboard & state pie charts to understand top illnesses.</li>
+          <li>After form submission you'll receive an SMS/WhatsApp (simulated here).</li>
+          <li>If risk threshold is crossed, you'll see a pop-up alert + tips & next steps.</li>
+        </ol>
+      </div>
+
+      <!-- CHARTS GRID -->
+      <div class="card">
+        <h3 id="dashTitle">Health Dashboard — Top 3 Diseases (small pies)</h3>
+        <p class="small-note">Each pie shows the relative distribution of the top 3 diseases in that state.<br>Colors: <span class="legend"><span class="dot green"></span>Green</span> / <span class="legend"><span class="dot yellow"></span>Yellow</span> / <span class="legend"><span class="dot red"></span>Red</span></p>
+
+        <div class="charts-grid" id="chartsGrid">
+          <!-- We'll generate 8 canvases (3 per row mostly) -->
+          <div class="chart-card"><strong>Assam</strong><canvas id="chart-Assam"></canvas></div>
+          <div class="chart-card"><strong>Arunachal Pradesh</strong><canvas id="chart-Arunachal"></canvas></div>
+          <div class="chart-card"><strong>Manipur</strong><canvas id="chart-Manipur"></canvas></div>
+
+          <div class="chart-card"><strong>Meghalaya</strong><canvas id="chart-Meghalaya"></canvas></div>
+          <div class="chart-card"><strong>Mizoram</strong><canvas id="chart-Mizoram"></canvas></div>
+          <div class="chart-card"><strong>Nagaland</strong><canvas id="chart-Nagaland"></canvas></div>
+
+          <div class="chart-card"><strong>Tripura</strong><canvas id="chart-Tripura"></canvas></div>
+          <div class="chart-card"><strong>Sikkim</strong><canvas id="chart-Sikkim"></canvas></div>
+        </div>
+      </div>
+
+    </div> <!-- end main -->
+
+    <!-- RIGHT COLUMN -->
+    <aside style="flex: 0 0 360px; display:flex; flex-direction:column; gap:12px;">
+
+      <!-- ALERTS BOX -->
+      <div class="card">
+        <h3 id="alertsTitle">Risk Alerts</h3>
+        <div class="alerts">
+          <div><span class="dot green"></span>Safe</div>
+          <div style="margin-left:8px;"><span class="dot yellow"></span>Moderate</div>
+          <div style="margin-left:8px;"><span class="dot red"></span>High</div>
+        </div>
+        <p class="small-note">Alerts are color-coded. The small pie-charts also use these colors for the three top diseases.</p>
+      </div>
+
+      <!-- FORM -->
+      <div class="card">
+        <h3 id="formTitle">Community Report Form</h3>
+        <form id="reportForm">
+          <!-- row: name & age -->
+          <div class="form-row">
+            <label for="nameInput" id="lblName">Name</label>
+            <input id="nameInput" name="name" class="big" type="text" required placeholder="Full name" />
+          </div>
+
+          <div class="form-row">
+            <label for="ageInput" id="lblAge">Age (18+)</label>
+            <input id="ageInput" name="age" type="number" min="18" required class="small" />
+          </div>
+
+          <div class="form-row">
+            <label for="stateInput" id="lblState">State</label>
+            <select id="stateInput" name="state" class="small" required>
+              <option value="">Select NE state</option>
+              <option>Assam</option>
+              <option>Arunachal Pradesh</option>
+              <option>Manipur</option>
+              <option>Meghalaya</option>
+              <option>Mizoram</option>
+              <option>Nagaland</option>
+              <option>Tripura</option>
+              <option>Sikkim</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <label for="emailInput" id="lblEmail">Gmail</label>
+            <input id="emailInput" name="email" type="email" placeholder="example@gmail.com" required class="big" />
+          </div>
+
+          <div class="form-row">
+            <label for="phoneInput" id="lblPhone">Phone no.</label>
+            <input id="phoneInput" name="phone" type="tel" placeholder="+91xxxxxxxxxx" required class="small" />
+          </div>
+
+          <div class="form-row">
+            <label for="addrInput" id="lblAddr">Address</label>
+            <input id="addrInput" name="address" type="text" class="big" placeholder="Address, street or block" />
+          </div>
+
+          <div class="form-row">
+            <label for="villageInput" id="lblVillage">Village</label>
+            <input id="villageInput" name="village" type="text" class="big" placeholder="Village name" />
+          </div>
+
+          <div class="form-row">
+            <label id="lblIllness">Illness name</label>
+            <input id="illnessInput" name="illness" type="text" placeholder="e.g., Diarrhea" class="big" />
+          </div>
+
+          <div class="form-row">
+            <label id="lblSymptom">Symptom (choose only one)</label>
+            <div>
+              <!-- single-choice enforced by JS (radios) -->
+              <label><input type="radio" name="symptom" value="Diarrhea" required> Diarrhea</label><br>
+              <label><input type="radio" name="symptom" value="Fever"> Fever</label><br>
+              <label><input type="radio" name="symptom" value="Vomiting"> Vomiting</label><br>
+              <label><input type="radio" name="symptom" value="Abdominal pain"> Abdominal pain</label>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label id="lblFreq">How often in your area?</label>
+            <select id="freqInput" name="frequency" required>
+              <option value="Daily">Daily</option>
+              <option value="Weekly">Weekly</option>
+              <option value="Monthly">Monthly</option>
+              <option value="Rarely">Rarely</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <label id="lblHospital">Nearby hospital</label>
+            <input id="hospitalInput" name="hospital" type="text" placeholder="Name of hospital" class="big" />
+          </div>
+
+          <div class="form-row">
+            <label id="lblWater">Recent water score</label>
+            <input id="waterInput" name="waterScore" type="number" min="0" max="100" placeholder="0-100" />
+          </div>
+
+          <div class="form-row">
+            <label id="lblRain">Recent rainfall date</label>
+            <input id="rainInput" name="rainDate" type="date" />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="submitBtn">Submit</button>
+            <button type="button" id="cancelBtn" class="btn btn-ghost">Cancel</button>
+          </div>
+
+          <div class="small-note">Note: This is a front-end prototype. Real SMS/WhatsApp requires backend (e.g., Twilio).</div>
+        </form>
+      </div>
+
+      <!-- simulated SMS area -->
+      <div class="card" id="smsCard">
+        <h3 id="smsTitle">Message center (simulated)</h3>
+        <div id="smsBox" class="muted">No messages yet. After submission you may "simulate" sending an SMS/WhatsApp.</div>
+        <div style="margin-top:8px;">
+          <button id="simulateSend" class="btn btn-primary" style="width:100%;">Simulate Send SMS/WhatsApp</button>
+        </div>
+      </div>
+
+    </aside>
+  </div> <!-- top-row -->
+
+  <footer style="text-align:center; margin-top:18px; color:#567;">
+    © 2025 Team SYNTAX ERROR — Prototype (HTML/CSS/JS)
+  </footer>
+</div>
+
+<!-- modal to show submission details -->
+<div id="modal" class="modal" role="dialog" aria-modal="true">
+  <div class="box">
+    <h3 id="modalTitle">Form submitted</h3>
+    <div id="modalContent"></div>
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <button id="closeModal" class="btn btn-primary">Close</button>
+      <button id="sendNow" class="btn btn-ghost">Send SMS/WhatsApp (simulate)</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================
+   Data + Config
+   ============================ */
+
+const colors = { green:'#2ecc71', yellow:'#f1c40f', red:'#e74c3c' };
+
+/* initial sample top-3 disease counts per state (these are example numbers) */
+const statesData = {
+  "Assam":       { labels:['Diarrhea','Typhoid','Cholera'], values:[60,30,10] },
+  "Arunachal Pradesh": { labels:['Diarrhea','Typhoid','Cholera'], values:[40,40,20] },
+  "Manipur":     { labels:['Diarrhea','Typhoid','Cholera'], values:[50,30,20] },
+  "Meghalaya":   { labels:['Diarrhea','Typhoid','Cholera'], values:[30,50,20] },
+  "Mizoram":     { labels:['Diarrhea','Typhoid','Cholera'], values:[20,30,50] },
+  "Nagaland":    { labels:['Diarrhea','Typhoid','Cholera'], values:[45,35,20] },
+  "Tripura":     { labels:['Diarrhea','Typhoid','Cholera'], values:[35,40,25] },
+  "Sikkim":      { labels:['Diarrhea','Typhoid','Cholera'], values:[25,50,25] }
+};
+
+/* keep references to Chart instances so we can update them after submissions */
+const charts = { };
+
+/* translations (samples) — expand or correct as needed */
+const i18n = {
+  en: {
+    title: "Smart Community Health Monitoring & Early Warning System",
+    aboutTitle: "What this website does",
+    aboutText: "A simple system to collect community reports, show small state-wise pie charts of top illnesses, compute a risk level per report and display alerts with short first-aid tips.",
+    stepsTitle: "Steps for users",
+    stepsList: [
+      "Fill the form (site form) with your details.",
+      "View the dashboard & state pie charts.",
+      "After form submission you'll receive a simulated SMS/WhatsApp.",
+      "If risk threshold is crossed, you'll see a popup alert + tips."
+    ],
+    dashTitle: "Health Dashboard — Top 3 Diseases (small pies)",
+    alertsTitle: "Risk Alerts",
+    formTitle: "Community Report Form",
+    smsTitle: "Message center (simulated)",
+    modalTitle: "Form submitted — details"
+  },
+  hi: {
+    title: "स्मार्ट सामुदायिक स्वास्थ्य निगरानी और प्रारम्भिक चेतावनी प्रणाली",
+    aboutTitle: "यह वेबसाइट क्या करती है",
+    aboutText: "समुदाय रिपोर्ट एकत्रित करने, राज्यों के शीर्ष रोगों के छोटे पाई चार्ट दिखाने, रिपोर्ट के अनुसार जोखिम स्तर निकालने और त्वरित प्राथमिक चिकित्सा सुझाव दिखाने का एक साधारण प्रोटोटाइप।",
+    stepsTitle: "उपयोगकर्ता हेतु कदम",
+    stepsList: [
+      "अपनी जानकारी भरने के लिए फॉर्म भरें।",
+      "डैशबोर्ड और राज्य पाई चार्ट देखें।",
+      "फॉर्म सबमिट करने के बाद आपको सिम्युलेटेड SMS/WhatsApp मिलेगा।",
+      "यदि जोखिम सीमा पार होती है, तो पॉप-अप चेतावनी और सुझाव दिखेंगे।"
+    ],
+    dashTitle: "स्वास्थ्य डैशबोर्ड — शीर्ष 3 रोग (छोटे पाई)",
+    alertsTitle: "जोखिम सूचनाएँ",
+    formTitle: "समुदाय रिपोर्ट फॉर्म",
+    smsTitle: "मैसेज सेंटर (सिम्युलेटेड)",
+    modalTitle: "फॉर्म सबमिट हुआ — विवरण"
+  },
+  as: {
+    title: "স্মাৰ্ট কমিউনিটি হেলথ মনিটৰিং আৰু আগন্তুক সতৰ্কীকৰণ প্ৰণালী",
+    aboutTitle: "এই ৱেবছাইটে কি কৰে",
+    aboutText: "সমাজৰ ৰিপ’ৰ্ট সংগ্ৰহ কৰা, ৰাজ্যভিত্তিক শীৰ্ষ ৰোগৰ সৰু পাই-চাৰ্ট দেখুওৱা, ৰিপ’ৰ্ট অনুসৰি ঝুঁকি-স্তৰ গণনা আৰু সৰু প্ৰাথমিক চিকিৎসা পৰামৰ্শ প্রদর্শন কৰা এক ছৰল প্ৰোটোটাইপ।",
+    stepsTitle: "ব্যৱহাৰকাৰীৰ বাবে ধাপসমূহ",
+    stepsList: [
+      "আপোনাৰ বিৱৰণ ভৰিবলৈ ফৰ্ম পূৰা।",
+      "ডেছব'ৰ্ড আৰু ৰাজ্য পাই-চাৰ্ট চাওক।",
+      "ফৰ্ম জমা দিয়া পাছত আপোনাক সিমুলেটেড SMS/WhatsApp পঠিয়োৱা হ'ব।",
+      "যদি ঝুঁকি সীমা অতিক্ৰম কৰে, পপ-আপ সতৰ্কীকৰণ আৰু পৰামৰ্শ দেখুওৱা হ'ব।"
+    ],
+    dashTitle: "স্বাস্থ্য ডੈশবেৰ্ড — শীৰ্ষ ৩ ৰোগ (সৰু পাই)",
+    alertsTitle: "ঝুঁকি সতৰ্কীকৰণ",
+    formTitle: "কমিউনিটি ৰিপ'ৰ্ট ফৰ্ম",
+    smsTitle: "মেছেজ কেছ (সিমুলেটেড)",
+    modalTitle: "ফৰ্ম জমা হৈছে — তথ্যসমূহ"
+  }
+};
+
+/* ============================
+   Render initial charts
+   ============================ */
+function createAllCharts() {
+  for (const state of Object.keys(statesData)) {
+    const canvasId = "chart-" + state.replace(/\s+/g,'');
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) continue;
+    const data = statesData[state];
+    const cfg = {
+      type: 'pie',
+      data: {
+        labels: data.labels,
+        datasets: [{
+          data: data.values,
+          backgroundColor: [colors.green, colors.yellow, colors.red],
+          borderColor: '#ffffff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels:{boxWidth:10, padding:8} } },
+      }
+    };
+    charts[state] = new Chart(ctx.getContext('2d'), cfg);
+  }
+}
+
+/* ============================
+   Utility: normalize & update state chart
+   ============================ */
+function normalize(arr) {
+  const sum = arr.reduce((s,x)=>s+(Number(x)||0),0) || 1;
+  return arr.map(v => Math.round((v/sum)*100));
+}
+function updateStateChart(state) {
+  const ch = charts[state];
+  if (!ch) return;
+  const newVals = statesData[state].values;
+  ch.data.datasets[0].data = newVals;
+  ch.update();
+}
+
+/* ============================
+   Risk Calculator
+   ============================ */
+function calculateRisk(symptom, frequency, waterScore) {
+  // base scores for symptoms
+  const base = { 'Diarrhea':3, 'Vomiting':3, 'Fever':2, 'Abdominal pain':1 };
+  const freqMul = { 'Daily':1.5, 'Weekly':1.2, 'Monthly':1.0, 'Rarely':0.6 };
+  const b = base[symptom] || 1;
+  const f = freqMul[frequency] || 1.0;
+  // waterScore reduces/increases risk slightly (higher badness -> +)
+  const waterFactor = 1 + ( (Number(waterScore)||50) - 50 )/200; // small effect
+  let raw = b * f * 28 * waterFactor; // scale
+  raw = Math.min(100, Math.round(raw));
+  const level = raw <= 40 ? 'green' : (raw <= 70 ? 'yellow' : 'red');
+  return { score: raw, level };
+}
+
+/* ============================
+   Form handling
+   ============================ */
+const form = document.getElementById('reportForm');
+const modal = document.getElementById('modal');
+const modalContent = document.getElementById('modalContent');
+const toast = document.getElementById('toast');
+
+form.addEventListener('submit', function(e){
+  e.preventDefault();
+
+  // gather values
+  const data = {
+    name: form.name.value.trim(),
+    age: Number(form.age.value||0),
+    state: form.state.value,
+    email: form.email.value.trim(),
+    phone: form.phone.value.trim(),
+    address: form.address.value.trim(),
+    village: form.village.value.trim(),
+    illness: form.illness.value.trim(),
+    symptom: form.symptom.value,
+    frequency: form.frequency.value,
+    hospital: form.hospital.value.trim(),
+    waterScore: form.waterScore.value,
+    rainDate: form.rainDate.value
+  };
+
+  // validation: age >=18
+  if (data.age < 18) { showToast("Age must be 18 or older."); return; }
+  if (!data.state) { showToast("Please select a North-East state."); return; }
+  if (!data.symptom) { showToast("Please choose a symptom."); return; }
+
+  // calculate risk
+  const risk = calculateRisk(data.symptom, data.frequency, data.waterScore);
+
+  // update the state's top-disease distribution by incrementing the matching symptom bucket
+  const s = statesData[data.state];
+  if (s) {
+    // map disease labels -> index
+    const idx = s.labels.indexOf(data.symptom);
+    if (idx >= 0) {
+      s.values[idx] = (Number(s.values[idx]||0) + 1); // increment count
+    } else {
+      // if that symptom isn't in top 3, add small bump to first
+      s.values[0] = (Number(s.values[0]||0) + 1);
+    }
+    // normalize to keep numbers comfortable
+    // (we keep them as counts, not forcing sum=100; Chart.js will display relative sizes)
+    updateStateChart(data.state);
+  }
+
+  // prepare modal content (non-editable)
+  modalContent.innerHTML = `
+    <p><strong>Name:</strong> ${escapeHTML(data.name)}</p>
+    <p><strong>Age:</strong> ${escapeHTML(data.age)}</p>
+    <p><strong>State:</strong> ${escapeHTML(data.state)}</p>
+    <p><strong>Email:</strong> ${escapeHTML(data.email)}</p>
+    <p><strong>Phone:</strong> ${escapeHTML(data.phone)}</p>
+    <p><strong>Village:</strong> ${escapeHTML(data.village)}</p>
+    <p><strong>Illness (name):</strong> ${escapeHTML(data.illness)}</p>
+    <p><strong>Symptom:</strong> ${escapeHTML(data.symptom)}</p>
+    <p><strong>How often:</strong> ${escapeHTML(data.frequency)}</p>
+    <p><strong>Nearby hospital:</strong> ${escapeHTML(data.hospital)}</p>
+    <p><strong>Recent water score:</strong> ${escapeHTML(data.waterScore)}</p>
+    <p><strong>Recent rainfall:</strong> ${escapeHTML(data.rainDate)}</p>
+    <hr>
+    <p><strong>Risk score:</strong> <span style="font-weight:900;color:${risk.level === 'green'?colors.green:(risk.level==='yellow'?colors.yellow:colors.red)}">${risk.score}</span></p>
+    <p><strong>Alert:</strong> ${risk.level === 'green' ? 'Safe' : (risk.level === 'yellow' ? 'Moderate' : 'High')}</p>
+    <div style="margin-top:8px; background:#f7fbff; padding:8px; border-radius:6px;">
+      <strong>Quick tips:</strong>
+      <div id="tipsArea">${getTips(data.symptom, risk.level)}</div>
+    </div>
+  `;
+
+  // open modal
+  modal.classList.add('open');
+
+  // store last submission for simulated send
+  window.lastSubmission = { data, risk };
+  // (do not clear form automatically — user may want to see)
+});
+
+/* Cancel button resets form */
+document.getElementById('cancelBtn').addEventListener('click', function(){
+  form.reset();
+});
+
+/* modal close */
+document.getElementById('closeModal').addEventListener('click', function(){
+  modal.classList.remove('open');
+});
+
+/* simulate send SMS/WhatsApp from modal */
+document.getElementById('sendNow').addEventListener('click', function(){
+  const last = window.lastSubmission;
+  if (!last) { showToast("No submission to send."); return; }
+  simulateMessageSend(last.data.phone, buildMessageText(last.data, last.risk));
+  showToast("Simulated message sent.");
+});
+
+/* separate simulate send button in right column */
+document.getElementById('simulateSend').addEventListener('click', function(){
+  if (!window.lastSubmission) { showToast("No recent submission to send."); return; }
+  const last = window.lastSubmission;
+  simulateMessageSend(last.data.phone, buildMessageText(last.data, last.risk));
+  showToast("Simulated message sent.");
+});
+
+/* helper: build message text short */
+function buildMessageText(d, risk) {
+  return `Alert: ${risk.level === 'green' ? 'SAFE' : (risk.level === 'yellow' ? 'MODERATE' : 'HIGH')}. Name:${d.name}. Symptom:${d.symptom}. Risk:${risk.score}. Tips: ${stripHtml(getTips(d.symptom,risk.level)).slice(0,160)}...`;
+}
+
+/* simulated send (just updates UI) */
+function simulateMessageSend(phone, text) {
+  const box = document.getElementById('smsBox');
+  const time = new Date().toLocaleString();
+  box.innerHTML = `<div style="padding:8px;border-radius:8px;background:#f7f7fb;border:1px solid #e4e8f0;">
+    <div style="font-size:0.92rem;"><strong>To:</strong> ${escapeHTML(phone||'unknown')}</div>
+    <div style="font-size:0.9rem;margin-top:6px">${escapeHTML(text)}</div>
+    <div style="font-size:0.78rem;color:#666;margin-top:8px">${time}</div>
+  </div>`;
+}
+
+/* show toast */
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(()=>{ toast.style.display='none'; }, 3200);
+}
+
+/* generate tips based on symptom and level */
+function getTips(symptom, level) {
+  const tips = {
+    'Diarrhea': {
+      green: "<ul><li>Drink ORS & clean water.</li><li>Maintain hygiene & handwashing.</li></ul>",
+      yellow: "<ul><li>ORS + visit nearby clinic if persists.</li><li>Check water source & boil water.</li></ul>",
+      red: "<ul><li>Seek immediate medical care. Keep hydrated. Possible IV required.</li><li>Isolate food/water sources & inform ASHA.</li></ul>"
+    },
+    'Fever': {
+      green: "<ul><li>Rest, paracetamol if needed, monitor temp.</li></ul>",
+      yellow: "<ul><li>See doctor if >48 hours, monitor other symptoms.</li></ul>",
+      red: "<ul><li>Go to hospital — high fever and danger signs.</li></ul>"
+    },
+    'Vomiting': {
+      green: "<ul><li>Small sips of ORS. Avoid heavy food.</li></ul>",
+      yellow: "<ul><li>Visit clinic if can't keep fluids down.</li></ul>",
+      red: "<ul><li>Hospitalize if dehydrated or persistent vomiting.</li></ul>"
+    },
+    'Abdominal pain': {
+      green: "<ul><li>Light diet; observe symptoms.</li></ul>",
+      yellow: "<ul><li>See local health worker if pain persists.</li></ul>",
+      red: "<ul><li>Seek urgent medical attention for severe pain.</li></ul>"
+    }
+  };
+  return (tips[symptom] && tips[symptom][level]) || "<p>Follow local health worker instructions.</p>";
+}
+
+/* simple escaping for safety */
+function escapeHTML(s) {
+  if (!s && s !== 0) return '';
+  return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+}
+
+/* strip html for SMS preview */
+function stripHtml(html){
+  return html.replace(/<\/?[^>]+(>|$)/g, "");
+}
+
+/* ============================
+   Translations (language switch)
+   ============================ */
+const langSelect = document.getElementById('langSelect');
+langSelect.addEventListener('change', applyLanguage);
+function applyLanguage(){
+  const lang = langSelect.value || 'en';
+  const L = i18n[lang] || i18n.en;
+
+  document.getElementById('title').textContent = L.title;
+  document.getElementById('aboutTitle').textContent = L.aboutTitle;
+  document.getElementById('aboutText').textContent = L.aboutText;
+  document.getElementById('stepsTitle').textContent = L.stepsTitle;
+  const stepsList = document.getElementById('stepsList');
+  stepsList.innerHTML = '';
+  (L.stepsList||[]).forEach(s => {
+    const li = document.createElement('li'); li.textContent = s; stepsList.appendChild(li);
+  });
+  document.getElementById('dashTitle').textContent = L.dashTitle;
+  document.getElementById('alertsTitle').textContent = L.alertsTitle;
+  document.getElementById('formTitle').textContent = L.formTitle;
+  document.getElementById('smsTitle').textContent = L.smsTitle;
+  document.getElementById('modalTitle').textContent = L.modalTitle;
+}
+
+/* initial apply */
+applyLanguage();
+
+/* ============================
+   Init charts when DOM ready
+   ============================ */
+document.addEventListener('DOMContentLoaded', () => {
+  createAllCharts();
+});
+
+/* ============================
+   Accessibility helpers (ESC to close modal)
+   ============================ */
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Escape') modal.classList.remove('open');
+});
+
+/* ============================
+   Notes:
+   - This is a front-end prototype only.
+   - To actually send SMS/WhatsApp messages, integrate a backend service (Twilio/Exotel):
+     1) Send form data to your server (POST).
+     2) Server calls Twilio API with credentials securely stored.
+     3) Twilio sends SMS/WhatsApp to user's number.
+   - You can replace the sample statesData numbers with real data (API or Google Sheets).
+   - For Google Form integration: instead of site form, you can link a Google Form URL
+     or submit programmatically to a Google Apps Script endpoint.
+   ============================ */
+</script>
+</body>
+</html>
